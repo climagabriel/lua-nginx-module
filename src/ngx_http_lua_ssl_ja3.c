@@ -55,6 +55,16 @@ ngx_http_lua_ssl_ja3_is_grease(unsigned int v)
 }
 
 
+static int
+ngx_http_lua_ssl_ja3_cmp_int(const void *a, const void *b)
+{
+    int  ia = *(const int *) a;
+    int  ib = *(const int *) b;
+
+    return (ia > ib) - (ia < ib);
+}
+
+
 static size_t
 ngx_http_lua_ssl_ja3_num_digits(unsigned int n)
 {
@@ -124,6 +134,13 @@ ngx_http_lua_ssl_ja3_collect(ngx_ssl_conn_t *ssl_conn, ngx_pool_t *pool,
             if (!ngx_http_lua_ssl_ja3_is_grease((unsigned int) ext_out[i])) {
                 ja3->extensions[ja3->extensions_n++] = ext_out[i];
             }
+        }
+
+        /* Chrome 110+ permutes ClientHello extension order to defeat stable
+         * fingerprinting; sort to recover stability (the "JA3N" variant). */
+        if (ja3->extensions_n > 1) {
+            ngx_qsort(ja3->extensions, ja3->extensions_n, sizeof(int),
+                      ngx_http_lua_ssl_ja3_cmp_int);
         }
     }
 

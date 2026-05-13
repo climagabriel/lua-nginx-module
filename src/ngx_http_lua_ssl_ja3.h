@@ -32,7 +32,7 @@ typedef struct {
 
 
 typedef struct {
-    ngx_str_t         ja3;          /* JA3 string, ClientHello extension order */
+    ngx_str_t         ja3;          /* JA3 string, extensions sorted (JA3N) */
     ngx_str_t         ja3_hash;     /* hex md5 of ja3 */
 } ngx_http_lua_ssl_ja3_cache_t;
 
