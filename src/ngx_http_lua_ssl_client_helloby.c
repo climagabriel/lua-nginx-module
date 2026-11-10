@@ -304,6 +304,16 @@ ngx_http_lua_ssl_client_hello_handler(ngx_ssl_conn_t *ssl_conn,
     c->log->action = "loading SSL client hello by lua";
 
     if (lscf->srv.ssl_client_hello_handler == NULL) {
+        /*
+         * since nginx 1.29.2 the connection has already switched to the
+         * server selected by SNI; fall back to the default server's handler,
+         * the one OpenSSL called us for
+         */
+        lscf = hc->addr_conf->default_server->ctx
+                   ->srv_conf[ngx_http_lua_module.ctx_index];
+    }
+
+    if (lscf->srv.ssl_client_hello_handler == NULL) {
         cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
 
         ngx_log_error(NGX_LOG_ALERT, c->log, 0,
