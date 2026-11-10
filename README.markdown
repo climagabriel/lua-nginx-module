@@ -2906,7 +2906,11 @@ library are particularly useful in this context.
 Note that this handler runs in extremely early stage of SSL handshake, before the SSL client hello extensions are parsed.
 So you can not use some Lua API like `ssl.server_name()` which is dependent on the later stage's processing.
 
-Also note that only the directive in default server is valid for several virtual servers with the same IP address and port.
+Also note that the directive takes effect only if the default server for the IP address and port has one;
+otherwise no `ssl_client_hello_by_lua*` handler runs on that address, even in a server that has its own.
+With nginx older than 1.29.2, the default server's handler runs for every virtual server on that address.
+With nginx 1.29.2 or later, nginx selects the virtual server by SNI before this handler runs:
+a server with its own directive runs its own handler, and a server without one runs the default server's handler.
 
 Below is a trivial example using the
 [ngx.ssl.clienthello](https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/ssl/clienthello.md) module

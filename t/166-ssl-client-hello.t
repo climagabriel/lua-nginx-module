@@ -3451,3 +3451,82 @@ qr/cert by: test start/,
 [error]
 [alert]
 [emerg]
+
+
+
+=== TEST 43: SNI selects a server without the directive; the default server's handler runs
+--- http_config
+    server {
+        listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+        server_name   test.com;
+        ssl_client_hello_by_lua_block {
+            local ssl_clt = require "ngx.ssl.clienthello"
+            print("client hello handler ran, sni: ",
+                  ssl_clt.get_client_hello_server_name())
+        }
+        ssl_certificate ../../cert/test.crt;
+        ssl_certificate_key ../../cert/test.key;
+    }
+
+    server {
+        listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+        server_name   test2.com;
+        ssl_certificate ../../cert/test.crt;
+        ssl_certificate_key ../../cert/test.key;
+
+        server_tokens off;
+        location /foo {
+            default_type 'text/plain';
+            content_by_lua_block { ngx.say("served by ", ngx.var.server_name) }
+        }
+    }
+--- config
+    server_tokens off;
+
+    location /t {
+        content_by_lua_block {
+            local sock = ngx.socket.tcp()
+            sock:settimeout(2000)
+
+            local ok, err = sock:connect("unix:$TEST_NGINX_HTML_DIR/nginx.sock")
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            local sess, err = sock:sslhandshake(nil, "test2.com", false)
+            if not sess then
+                ngx.say("failed to do SSL handshake: ", err)
+                return
+            end
+
+            ngx.say("ssl handshake: ", type(sess))
+
+            local req = "GET /foo HTTP/1.0\r\nHost: test2.com\r\n\r\n"
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send http request: ", err)
+                return
+            end
+
+            local body = sock:receive("*a")
+            ngx.say(body:match("served by [^\r\n]+"))
+            sock:close()
+        }
+    }
+
+--- request
+GET /t
+--- response_body
+ssl handshake: cdata
+served by test2.com
+
+--- error_log
+client hello handler ran, sni: test2.com
+
+--- no_error_log
+[error]
+[alert]
+--- grep_error_log eval: qr/client hello handler ran, sni: [^,\s]+/
+--- grep_error_log_out
+client hello handler ran, sni: test2.com
